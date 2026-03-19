@@ -1,11 +1,11 @@
 from fastapi import FastAPI
-from app.routes import resume, interview
+from app.routes import resume, interview, confidence
 from fastapi.middleware.cors import CORSMiddleware
-# import threading
-# from app.services.vision import start_confidence_tracking
+from chatbot.chatbot_routes import router as chatbot_router
+import threading
+from app.services.vision import start_confidence_tracking
 
-# 🔥 Start background confidence tracking
-# threading.Thread(target=start_confidence_tracking, daemon=True).start()
+
 
 app = FastAPI()
 
@@ -17,11 +17,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# 🔥 Start background confidence tracking
+threading.Thread(target=start_confidence_tracking, daemon=True).start()
 
 # ✅ ROUTES
 app.include_router(resume.router)
 app.include_router(interview.router)
-# app.include_router(confidence.router)
+app.include_router(confidence.router)
+app.include_router(chatbot_router)
 
 @app.get("/")
 def home():

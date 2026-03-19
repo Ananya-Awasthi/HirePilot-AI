@@ -1,3 +1,5 @@
+
+
 import cv2
 import numpy as np
 
@@ -13,33 +15,33 @@ eye_cascade = cv2.CascadeClassifier(
 )
 
 # 🔥 LOAD YOLO
-net = cv2.dnn.readNet("app/models/yolov3-tiny.weights", "app/models/yolov3-tiny.cfg")
+# net = cv2.dnn.readNet("app/models/yolov3-tiny.weights", "app/models/yolov3-tiny.cfg")
 
-with open("app/models/coco.names", "r") as f:
-    classes = [line.strip() for line in f.readlines()]
+# with open("app/models/coco.names", "r") as f:
+#     classes = [line.strip() for line in f.readlines()]
 
-layer_names = net.getLayerNames()
-output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
+# layer_names = net.getLayerNames()
+# output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
 
 
-def detect_phone(frame):
-    h, w, _ = frame.shape
+# def detect_phone(frame):
+#     h, w, _ = frame.shape
 
-    blob = cv2.dnn.blobFromImage(frame, 1/255.0, (416, 416), swapRB=True, crop=False)
-    net.setInput(blob)
-    outputs = net.forward(output_layers)
+#     blob = cv2.dnn.blobFromImage(frame, 1/255.0, (416, 416), swapRB=True, crop=False)
+#     net.setInput(blob)
+#     outputs = net.forward(output_layers)
 
-    for output in outputs:
-        for detection in output:
-            scores = detection[5:]
-            class_id = np.argmax(scores)
-            confidence = scores[class_id]
+#     for output in outputs:
+#         for detection in output:
+#             scores = detection[5:]
+#             class_id = np.argmax(scores)
+#             confidence = scores[class_id]
 
-            # 📱 class 67 = "cell phone"
-            if class_id == 67 and confidence > 0.5:
-                return True
+#             # 📱 class 67 = "cell phone"
+#             if class_id == 67 and confidence > 0.5:
+#                 return True
 
-    return False
+#     return False
 
 
 def start_confidence_tracking():
@@ -93,9 +95,9 @@ def start_confidence_tracking():
                 cv2.rectangle(roi_color, (ex, ey), (ex+ew, ey+eh), (0, 255, 0), 2)
 
         # 🔥 PHONE DETECTION (REAL)
-        if detect_phone(frame):
-            warning_text = "📱 Phone detected!"
-            confidence_score -= 5
+        # if detect_phone(frame):
+        #     warning_text = "📱 Phone detected!"
+        #     confidence_score -= 5
 
         confidence_score = max(0, min(100, confidence_score))
         confidence_score_global = confidence_score

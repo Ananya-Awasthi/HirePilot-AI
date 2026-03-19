@@ -1,4 +1,7 @@
+import { useNavigate } from "react-router-dom";
+
 export default function Navbar() {
+    const navigate = useNavigate();
   return (
     <nav>
       <a href="#" className="nav-logo">
@@ -14,7 +17,11 @@ export default function Navbar() {
         HirePilot
       </a>
 
-      <a href="#cta" className="nav-pill">Try Demo →</a>
+      
+
+      <button  className="nav-pill"onClick={() => navigate("/details")}>
+         Try Demo
+       </button>
     </nav>
   );
 }

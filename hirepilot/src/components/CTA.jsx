@@ -1,4 +1,6 @@
+import { useNavigate } from "react-router-dom";
 export default function CTA() {
+    const navigate = useNavigate();
   return (
     <section className="cta-sec">
 
@@ -14,9 +16,12 @@ export default function CTA() {
       </p>
 
       <div className="cta-btns">
-        <button className="btn-white">
-          🚀 Launch Demo
-        </button>
+        <button
+  className="btn-white"
+  onClick={() => navigate("/details")}
+>
+  Launch Demo 🚀
+</button>
 
         <a href="#how" className="btn-gw">
           Learn More

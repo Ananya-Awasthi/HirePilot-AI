@@ -1,3 +1,4 @@
+
 from fastapi import APIRouter
 from app.services.vision import get_confidence_score
 
