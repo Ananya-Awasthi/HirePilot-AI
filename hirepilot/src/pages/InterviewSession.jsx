@@ -635,6 +635,17 @@ const [warning, setWarning] = useState("");
 const [modelsLoaded, setModelsLoaded] = useState(false);
 
 
+const logWarning = (type) => {
+  const prev = JSON.parse(localStorage.getItem("warnings") || "[]");
+
+  prev.push({
+    type,
+    time: new Date().toLocaleTimeString()
+  });
+
+  localStorage.setItem("warnings", JSON.stringify(prev));
+};
+
 
 const sendFrameToBackend = async () => {
   if (!videoRef.current) return;
@@ -676,6 +687,7 @@ useEffect(() => {
     if (document.hidden) {
       console.log("⚠️ Tab switched");
       setWarning("🚨 Tab switched detected!");
+      logWarning("Tab Switch");
 
 
       fetch("http://localhost:8001/vision/tab-switch", {
@@ -763,8 +775,10 @@ useEffect(() => {
 
       if (detections.length === 0) {
         setWarning("⚠️ No face detected");
+        logWarning("No Face");
       } else if (detections.length > 1) {
         setWarning("⚠️ Multiple people detected");
+        logWarning("Multiple People");
       } else {
         const face = detections[0];
         setWarning("");
@@ -778,11 +792,24 @@ useEffect(() => {
 
         if (Math.abs(noseX - eyeMidX) > 25) {
           setWarning("⚠️ Look at screen");
+          logWarning("Looking Away");
         }
 
         const exp = face.expressions;
         const conf = Math.round((exp.happy + exp.neutral) * 50);
         setConfidence(conf);
+        
+
+        setConfidenceHistory(prev => {
+  const updated = [...prev, {
+    value: conf,
+    time: new Date().toLocaleTimeString()
+  }];
+
+  localStorage.setItem("confidenceHistory", JSON.stringify(updated));
+
+  return updated;
+});
       }
 
       const canvas = canvasRef.current;
@@ -835,6 +862,9 @@ useEffect(() => {
     const rt = localStorage.getItem("resumeText") || "";
     setRole(r); setResumeText(rt);
     startInterview(r, rt);
+    localStorage.removeItem("snapshots");
+localStorage.removeItem("confidenceHistory");
+localStorage.removeItem("warnings");
   }, []);
 
   // Timer
@@ -907,6 +937,39 @@ useEffect(() => {
   const urgent    = timeLeft < 60;
   const confLow   = confidence < 50;
   const confPoor  = confidence < 30;
+  
+  const captureImage = () => {
+  if (!videoRef.current) return;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = videoRef.current.videoWidth;
+  canvas.height = videoRef.current.videoHeight;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(videoRef.current, 0, 0);
+
+  const image = canvas.toDataURL("image/jpeg");
+
+  // get old images
+  const prev = JSON.parse(localStorage.getItem("snapshots") || "[]");
+
+  // add new image
+  prev.push({
+    img: image,
+    time: new Date().toLocaleTimeString()
+  });
+
+  localStorage.setItem("snapshots", JSON.stringify(prev));
+};
+
+useEffect(() => {
+  const interval = setInterval(() => {
+    captureImage();
+  }, 15000); // 15 sec
+
+  return () => clearInterval(interval);
+}, []);
+
 
   return (
     <>
