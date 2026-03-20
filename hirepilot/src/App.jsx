@@ -19,7 +19,7 @@ import Details from "./pages/Details";
 import Interview from "./pages/Interview";
 import InterviewSession from "./pages/InterviewSession";
 
-import dashboard from "./pages/Dashboard";
+import Dashboard from "./pages/Dashboard";
 
 export default function App() {
 
@@ -64,7 +64,7 @@ export default function App() {
         <Route path="/details" element={<Details />} />
 
         {/* 📊 DASHBOARD PAGE */}
-        <Route path="/dashboard" element={<dashboard />} />
+        <Route path="/dashboard" element={<Dashboard />} />
 
       </Routes>
 

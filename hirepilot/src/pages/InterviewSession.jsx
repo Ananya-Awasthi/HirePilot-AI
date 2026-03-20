@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import * as faceapi from "face-api.js";
 
 const BASE_URL = "http://localhost:8001";
 
@@ -629,6 +630,68 @@ export default function InterviewSession() {
   const videoRef                        = useRef(null);
   const [qaList, setQaList] = useState([]);
   const [confidenceHistory, setConfidenceHistory] = useState([]);
+  const canvasRef = useRef(null);
+const [warning, setWarning] = useState("");
+const [modelsLoaded, setModelsLoaded] = useState(false);
+
+
+
+const sendFrameToBackend = async () => {
+  if (!videoRef.current) return;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = videoRef.current.videoWidth;
+  canvas.height = videoRef.current.videoHeight;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(videoRef.current, 0, 0);
+
+  const blob = await new Promise(resolve =>
+    canvas.toBlob(resolve, "image/jpeg")
+  );
+
+  const formData = new FormData();
+  formData.append("file", blob);
+
+  try {
+    const res = await fetch("http://localhost:8001/vision/analyze", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+
+    console.log("OpenCV:", data);
+
+    setWarning(data.warning);
+    setConfidence(data.confidence);
+
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+useEffect(() => {
+  const handleVisibility = () => {
+    if (document.hidden) {
+      console.log("⚠️ Tab switched");
+      setWarning("🚨 Tab switched detected!");
+
+
+      fetch("http://localhost:8001/vision/tab-switch", {
+        method: "POST"
+      });
+      setTimeout(() => {
+    setWarning("");
+  }, 3000);
+    }
+  };
+
+  document.addEventListener("visibilitychange", handleVisibility);
+
+  return () =>
+    document.removeEventListener("visibilitychange", handleVisibility);
+}, []);
 
   // Inject CSS once
   useEffect(() => {
@@ -656,6 +719,92 @@ export default function InterviewSession() {
     })();
     return () => stream?.getTracks().forEach(t => t.stop());
   }, []);
+   
+  useEffect(() => {
+  const loadModels = async () => {
+    const MODEL_URL = "/models";
+
+    try {
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+      await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
+
+      console.log("✅ Models loaded");
+      setModelsLoaded(true);
+    } catch (err) {
+      console.error("❌ Model load error:", err);
+    }
+  };
+
+  loadModels();
+}, []);
+
+  useEffect(() => {
+  if (!modelsLoaded) return;
+
+  let interval;
+
+  const start = () => {
+    interval = setInterval(async () => {
+      if (!videoRef.current || videoRef.current.readyState !== 4) return;
+
+      const detections = await faceapi
+        .detectAllFaces(
+          videoRef.current,
+          new faceapi.TinyFaceDetectorOptions({
+  inputSize: 512,
+  scoreThreshold: 0.3
+})
+        )
+        .withFaceLandmarks()
+        .withFaceExpressions();
+
+      console.log("detections:", detections);
+
+      if (detections.length === 0) {
+        setWarning("⚠️ No face detected");
+      } else if (detections.length > 1) {
+        setWarning("⚠️ Multiple people detected");
+      } else {
+        const face = detections[0];
+        setWarning("");
+
+        const nose = face.landmarks.getNose();
+        const leftEye = face.landmarks.getLeftEye();
+        const rightEye = face.landmarks.getRightEye();
+
+        const noseX = nose[3].x;
+        const eyeMidX = (leftEye[0].x + rightEye[3].x) / 2;
+
+        if (Math.abs(noseX - eyeMidX) > 25) {
+          setWarning("⚠️ Look at screen");
+        }
+
+        const exp = face.expressions;
+        const conf = Math.round((exp.happy + exp.neutral) * 50);
+        setConfidence(conf);
+      }
+
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const dims = faceapi.matchDimensions(canvas, videoRef.current, true);
+        const resized = faceapi.resizeResults(detections, dims);
+
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        faceapi.draw.drawDetections(canvas, resized);
+      }
+      await sendFrameToBackend();
+
+    }, 1200);
+  };
+
+  videoRef.current?.addEventListener("loadeddata", start);
+
+  return () => clearInterval(interval);
+}, [modelsLoaded]);
+
 
   // Speech recognition
   useEffect(() => {
@@ -695,17 +844,7 @@ export default function InterviewSession() {
     return () => clearInterval(id);
   }, [timeLeft]);
 
-  // Confidence polling
-  useEffect(() => {
-    const id = setInterval(async () => {
-      try {
-        const res  = await fetch(`${BASE_URL}/confidence/score`);
-        const data = await res.json();
-        setConfidence(data.confidence_score);
-      } catch {}
-    }, 2000);
-    return () => clearInterval(id);
-  }, []);
+  
 
   const startInterview = async (r, rt) => {
     try {
@@ -755,7 +894,7 @@ export default function InterviewSession() {
     recognition?.stop();
     setIsListening(false);
     alert("Interview complete ✅");
-    window.location.href = "/";
+    window.location.href = "/dashboard";
   };
 
   const formatTime = () => {
@@ -884,7 +1023,7 @@ export default function InterviewSession() {
         <div className="hp-right">
 
           {/* Camera */}
-          <div className="hp-card hp-camera-card">
+          {/* <div className="hp-card hp-camera-card">
             <span className="hp-camera-label">You</span>
             <span className="hp-camera-live">
               <span className="hp-camera-live-dot"/>
@@ -896,7 +1035,53 @@ export default function InterviewSession() {
               muted
               style={{ borderRadius: 0, aspectRatio: "4/3", objectFit: "cover" }}
             />
-          </div>
+          </div> */}
+
+          <div className="hp-card hp-camera-card" style={{ position: "relative" }}>
+  <span className="hp-camera-label">You</span>
+  <span className="hp-camera-live">
+    <span className="hp-camera-live-dot"/>
+    LIVE
+  </span>
+
+  <video
+    ref={videoRef}
+    autoPlay
+    muted
+    style={{
+      width: "100%",
+      aspectRatio: "4/3",
+      objectFit: "cover"
+    }}
+  />
+
+  {/* 🔥 THIS WAS MISSING */}
+  <canvas
+    ref={canvasRef}
+    style={{
+      position: "absolute",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%"
+    }}
+  />
+
+  {warning && (
+    <div style={{
+      position: "absolute",
+      bottom: 10,
+      left: 10,
+      background: "rgba(0,0,0,0.7)",
+      color: "white",
+      padding: "6px 10px",
+      borderRadius: "8px",
+      fontSize: "12px"
+    }}>
+      {warning}
+    </div>
+  )}
+</div>
 
           {/* Answer */}
           <div className="hp-card hp-answer-card">
