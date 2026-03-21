@@ -3,13 +3,21 @@
 HirePilot AI is an intelligent interview preparation platform that simulates real interview experiences using AI. 
 It analyzes resumes, generates role-based questions, captures user responses, and provides insights through a live dashboard.
 ---
+
 **📌 Features**
+
 -🎯 AI-generated interview questions based on role & resume
+
 -🎤 Voice input + speech-to-text processing
+
 -📸 Live camera capture for monitoring (every 15 sec)
+
 -🧠 Follow-up question generation
+
 -📊 Dashboard with captured snapshots & session analysis
+
 -💬 Interactive chatbot support
+
 -⚡ Real-time frontend + backend integration
 
 ---
@@ -67,18 +75,29 @@ npm start
 
 **🧠 How It Works**
 -User uploads resume & selects role
+
 -AI generates first interview question
+
 -User answers via voice/text
+
 -Backend processes response
+
 -AI generates follow-up questions
+
 -Camera captures images every 15 seconds
+
 -Dashboard displays session insights
 
 ---
 
 **🚧 Future Improvements**
+
 -Emotion detection
+
 -AI scoring system
+
 -Detailed feedback reports
+
 -Multi-role interview simulation
+
 -Cloud deployment
