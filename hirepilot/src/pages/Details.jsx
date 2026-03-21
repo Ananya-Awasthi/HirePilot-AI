@@ -7,16 +7,35 @@ export default function Details() {
   const navigate = useNavigate();
   const [selectedExp, setSelectedExp] = useState("");
   const [showContext, setShowContext] = useState(false);
+  const [name, setName] = useState("");
+const [role, setRole] = useState("");
+const [email, setEmail] = useState("");
+const [phone, setPhone] = useState("");
+const [experience, setExperience] = useState("");
+const [context, setContext] = useState("");
 
   const handleExp = (level) => {
     setSelectedExp(level);
+     setExperience(level);
     setShowContext(true);
   };
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    navigate("/interview"); // ✅ navigation fixed
+  e.preventDefault();
+
+  const userData = {
+    name,
+    role,
+    experience,
+    email,
+    phone,
+    context
   };
+
+  localStorage.setItem("userDetails", JSON.stringify(userData));
+
+  navigate("/interview");
+};
 
   return (
     <>
@@ -93,14 +112,17 @@ export default function Details() {
                 <div className="form-group">
                   <label className="form-label">Full Name</label>
                   <input
-                    className="form-input"
-                    placeholder="e.g. Aanya Sharma"
-                  />
+  className="form-input"
+  value={name}
+  onChange={(e) => setName(e.target.value)}
+  placeholder="e.g. Aanya Sharma"
+/>
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Target Role</label>
-                  <select className="form-input">
+                  <select className="form-input" value={role}
+  onChange={(e) => setRole(e.target.value)}>
                     <option>Select a role…</option>
                     <option>Software Engineer</option>
                     <option>Frontend Developer</option>
@@ -156,17 +178,21 @@ export default function Details() {
                 <div className="form-group">
                   <label className="form-label">Phone Number</label>
                   <input
-                    className="form-input"
-                    placeholder="+91 98765 43210"
-                  />
+  className="form-input"
+  value={phone}
+  onChange={(e) => setPhone(e.target.value)}
+  placeholder="+91 98765 43210"
+/>
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Email Address</label>
                   <input
-                    className="form-input"
-                    placeholder="you@example.com"
-                  />
+  className="form-input"
+  value={email}
+  onChange={(e) => setEmail(e.target.value)}
+  placeholder="you@example.com"
+/>
                 </div>
               </div>
 

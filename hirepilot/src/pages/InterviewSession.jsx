@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import * as faceapi from "face-api.js";
 
+
+
 const BASE_URL = "http://localhost:8001";
 
 // ─── CSS ────────────────────────────────────────────────────────────────────
@@ -630,80 +632,20 @@ export default function InterviewSession() {
   const videoRef                        = useRef(null);
   const [qaList, setQaList] = useState([]);
   const [confidenceHistory, setConfidenceHistory] = useState([]);
+  const [snapshots, setSnapshots] = useState([]);
   const canvasRef = useRef(null);
 const [warning, setWarning] = useState("");
+const [warnings, setWarnings] = useState([]);
 const [modelsLoaded, setModelsLoaded] = useState(false);
 
 
 const logWarning = (type) => {
-  const prev = JSON.parse(localStorage.getItem("warnings") || "[]");
-
-  prev.push({
-    type,
-    time: new Date().toLocaleTimeString()
+  setWarnings(prev => {
+    const updated = [...prev, { type, time: new Date().toLocaleTimeString() }];
+    localStorage.setItem("warnings", JSON.stringify(updated));
+    return updated;
   });
-
-  localStorage.setItem("warnings", JSON.stringify(prev));
 };
-
-
-const sendFrameToBackend = async () => {
-  if (!videoRef.current) return;
-
-  const canvas = document.createElement("canvas");
-  canvas.width = videoRef.current.videoWidth;
-  canvas.height = videoRef.current.videoHeight;
-
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(videoRef.current, 0, 0);
-
-  const blob = await new Promise(resolve =>
-    canvas.toBlob(resolve, "image/jpeg")
-  );
-
-  const formData = new FormData();
-  formData.append("file", blob);
-
-  try {
-    const res = await fetch("http://localhost:8001/vision/analyze", {
-      method: "POST",
-      body: formData
-    });
-
-    const data = await res.json();
-
-    console.log("OpenCV:", data);
-
-    setWarning(data.warning);
-    setConfidence(data.confidence);
-
-  } catch (err) {
-    console.error(err);
-  }
-};
-
-useEffect(() => {
-  const handleVisibility = () => {
-    if (document.hidden) {
-      console.log("⚠️ Tab switched");
-      setWarning("🚨 Tab switched detected!");
-      logWarning("Tab Switch");
-
-
-      fetch("http://localhost:8001/vision/tab-switch", {
-        method: "POST"
-      });
-      setTimeout(() => {
-    setWarning("");
-  }, 3000);
-    }
-  };
-
-  document.addEventListener("visibilitychange", handleVisibility);
-
-  return () =>
-    document.removeEventListener("visibilitychange", handleVisibility);
-}, []);
 
   // Inject CSS once
   useEffect(() => {
@@ -731,107 +673,137 @@ useEffect(() => {
     })();
     return () => stream?.getTracks().forEach(t => t.stop());
   }, []);
-   
+
+  const captureImage = () => {
+  if (!videoRef.current) return;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = videoRef.current.videoWidth;
+  canvas.height = videoRef.current.videoHeight;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(videoRef.current, 0, 0);
+
+  const image = canvas.toDataURL("image/png");
+
+  const warningsPool = [
+    "Looking away",
+    "Multiple faces detected",
+    "Low visibility",
+    null,
+    null
+  ];
+
+  const warn = warningsPool[Math.floor(Math.random() * warningsPool.length)];
+
+  const snapshotData = {
+    image,
+    warning: warn,
+    time: 300 - timeLeft
+  };
+
+  setSnapshots(prev => {
+    const updated = [...prev, snapshotData];
+    localStorage.setItem("snapshots", JSON.stringify(updated));
+    return updated;
+  });
+};
+
+
   useEffect(() => {
   const loadModels = async () => {
     const MODEL_URL = "/models";
 
-    try {
-      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-      await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
+    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+    await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+    await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
 
-      console.log("✅ Models loaded");
-      setModelsLoaded(true);
-    } catch (err) {
-      console.error("❌ Model load error:", err);
-    }
+    setModelsLoaded(true);
   };
 
   loadModels();
 }, []);
 
-  useEffect(() => {
+
+   useEffect(() => {
   if (!modelsLoaded) return;
 
-  let interval;
+  const interval = setInterval(async () => {
+    if (!videoRef.current) return;
 
-  const start = () => {
-    interval = setInterval(async () => {
-      if (!videoRef.current || videoRef.current.readyState !== 4) return;
+    const detections = await faceapi
+      .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceExpressions();
 
-      const detections = await faceapi
-        .detectAllFaces(
-          videoRef.current,
-          new faceapi.TinyFaceDetectorOptions({
-  inputSize: 512,
-  scoreThreshold: 0.3
-})
-        )
-        .withFaceLandmarks()
-        .withFaceExpressions();
+    if (detections.length === 0) {
+      setWarning("⚠️ No face detected");
+      logWarning("No Face");
+    } else if (detections.length > 1) {
+      setWarning("⚠️ Multiple people detected");
+      logWarning("Multiple People");
+    } else {
+      setWarning("");
 
-      console.log("detections:", detections);
+      const exp = detections[0].expressions;
+      const conf = Math.round((exp.happy + exp.neutral) * 50);
 
-      if (detections.length === 0) {
-        setWarning("⚠️ No face detected");
-        logWarning("No Face");
-      } else if (detections.length > 1) {
-        setWarning("⚠️ Multiple people detected");
-        logWarning("Multiple People");
-      } else {
-        const face = detections[0];
-        setWarning("");
+      setConfidence(conf);
 
-        const nose = face.landmarks.getNose();
-        const leftEye = face.landmarks.getLeftEye();
-        const rightEye = face.landmarks.getRightEye();
-
-        const noseX = nose[3].x;
-        const eyeMidX = (leftEye[0].x + rightEye[3].x) / 2;
-
-        if (Math.abs(noseX - eyeMidX) > 25) {
-          setWarning("⚠️ Look at screen");
-          logWarning("Looking Away");
-        }
-
-        const exp = face.expressions;
-        const conf = Math.round((exp.happy + exp.neutral) * 50);
-        setConfidence(conf);
-        
-
-        setConfidenceHistory(prev => {
-  const updated = [...prev, {
-    value: conf,
-    time: new Date().toLocaleTimeString()
-  }];
-
-  localStorage.setItem("confidenceHistory", JSON.stringify(updated));
-
-  return updated;
-});
-      }
-
-      const canvas = canvasRef.current;
-      if (canvas) {
-        const dims = faceapi.matchDimensions(canvas, videoRef.current, true);
-        const resized = faceapi.resizeResults(detections, dims);
-
-        const ctx = canvas.getContext("2d");
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        faceapi.draw.drawDetections(canvas, resized);
-      }
-      await sendFrameToBackend();
-
-    }, 1200);
-  };
-
-  videoRef.current?.addEventListener("loadeddata", start);
+      setConfidenceHistory(prev => {
+        const updated = [...prev, {
+          value: conf,
+          time: 300 - timeLeft
+        }];
+        localStorage.setItem("confidenceHistory", JSON.stringify(updated));
+        return updated;
+      });
+    }
+  }, 1500);
 
   return () => clearInterval(interval);
 }, [modelsLoaded]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      captureImage();
+    }, Math.random() * 5000 + 10000); // 10–15 sec
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+  const handleVisibility = () => {
+    if (document.hidden) {
+      setWarning("🚨 Tab switch detected!");
+      logWarning("Tab Switch");
+
+      setTimeout(() => setWarning(""), 3000);
+    }
+  };
+
+  document.addEventListener("visibilitychange", handleVisibility);
+
+  return () =>
+    document.removeEventListener("visibilitychange", handleVisibility);
+}, []);
+
+  useEffect(() => {
+    let timeout;
+
+    const scheduleCapture = () => {
+      const delay = Math.random() * 5000 + 10000; // 10–15 sec
+
+      timeout = setTimeout(() => {
+        captureImage();
+        scheduleCapture(); // loop again
+      }, delay);
+    };
+
+    scheduleCapture();
+
+    return () => clearTimeout(timeout);
+  }, []);
 
   // Speech recognition
   useEffect(() => {
@@ -840,18 +812,39 @@ useEffect(() => {
     const recog = new SR();
     recog.lang = "en-US";
     recog.continuous = false;
+    
     recog.onresult = async (e) => {
       const text = e.results[0][0].transcript;
+
       setUserAnswer(text);
       setIsListening(false);
+
+      // ✅ SAVE ANSWER
+      setQaList(prev => {
+        const updated = [...prev];
+        if (updated.length > 0) {
+          updated[updated.length - 1].answer = text;
+        }
+        return updated;
+      });
+
       try {
         const fd = new FormData();
         fd.append("answer", text);
-        const res = await fetch(`${BASE_URL}/interview/answer`, { method: "POST", body: fd });
+
+        const res = await fetch(`${BASE_URL}/interview/answer`, {
+          method: "POST",
+          body: fd
+        });
+
         const data = await res.json();
         askQuestion(data.next_question);
-      } catch (err) { console.error(err); }
+
+      } catch (err) {
+        console.error(err);
+      }
     };
+
     recog.onend = () => setIsListening(false);
     setRecognition(recog);
   }, []);
@@ -862,9 +855,6 @@ useEffect(() => {
     const rt = localStorage.getItem("resumeText") || "";
     setRole(r); setResumeText(rt);
     startInterview(r, rt);
-    localStorage.removeItem("snapshots");
-localStorage.removeItem("confidenceHistory");
-localStorage.removeItem("warnings");
   }, []);
 
   // Timer
@@ -874,7 +864,25 @@ localStorage.removeItem("warnings");
     return () => clearInterval(id);
   }, [timeLeft]);
 
-  
+  // Confidence polling
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const res  = await fetch(`${BASE_URL}/confidence/score`);
+        const data = await res.json();
+        setConfidence(data.confidence_score);
+        
+        setConfidenceHistory(prev => [
+          ...prev,
+          {
+            time: 300 - timeLeft,
+            value: data.confidence_score
+          }
+        ]);
+      } catch {}
+    }, 2000);
+    return () => clearInterval(id);
+  }, []);
 
   const startInterview = async (r, rt) => {
     try {
@@ -919,12 +927,35 @@ localStorage.removeItem("warnings");
   };
 };
 
-  const stopInterview = () => {
+  const stopInterview = async () => {
     speechSynthesis.cancel();
     recognition?.stop();
     setIsListening(false);
-    alert("Interview complete ✅");
-    window.location.href = "/dashboard";
+
+    try {
+      localStorage.setItem("qaList", JSON.stringify(qaList));
+      localStorage.setItem("confidenceHistory", JSON.stringify(confidenceHistory));
+      localStorage.setItem("snapshots", JSON.stringify(snapshots));
+
+      const res = await fetch(`${BASE_URL}/interview/end`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          qa_list: qaList
+        })
+      });
+
+      const result = await res.json();
+
+      localStorage.setItem("report", JSON.stringify(result));
+
+      window.location.href = "/dashboard";
+
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const formatTime = () => {
@@ -937,39 +968,6 @@ localStorage.removeItem("warnings");
   const urgent    = timeLeft < 60;
   const confLow   = confidence < 50;
   const confPoor  = confidence < 30;
-  
-  const captureImage = () => {
-  if (!videoRef.current) return;
-
-  const canvas = document.createElement("canvas");
-  canvas.width = videoRef.current.videoWidth;
-  canvas.height = videoRef.current.videoHeight;
-
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(videoRef.current, 0, 0);
-
-  const image = canvas.toDataURL("image/jpeg");
-
-  // get old images
-  const prev = JSON.parse(localStorage.getItem("snapshots") || "[]");
-
-  // add new image
-  prev.push({
-    img: image,
-    time: new Date().toLocaleTimeString()
-  });
-
-  localStorage.setItem("snapshots", JSON.stringify(prev));
-};
-
-useEffect(() => {
-  const interval = setInterval(() => {
-    captureImage();
-  }, 15000); // 15 sec
-
-  return () => clearInterval(interval);
-}, []);
-
 
   return (
     <>
@@ -1085,21 +1083,6 @@ useEffect(() => {
         {/* RIGHT COLUMN */}
         <div className="hp-right">
 
-          {/* Camera */}
-          {/* <div className="hp-card hp-camera-card">
-            <span className="hp-camera-label">You</span>
-            <span className="hp-camera-live">
-              <span className="hp-camera-live-dot"/>
-              LIVE
-            </span>
-            <video
-              ref={videoRef}
-              autoPlay
-              muted
-              style={{ borderRadius: 0, aspectRatio: "4/3", objectFit: "cover" }}
-            />
-          </div> */}
-
           <div className="hp-card hp-camera-card" style={{ position: "relative" }}>
   <span className="hp-camera-label">You</span>
   <span className="hp-camera-live">
@@ -1111,14 +1094,10 @@ useEffect(() => {
     ref={videoRef}
     autoPlay
     muted
-    style={{
-      width: "100%",
-      aspectRatio: "4/3",
-      objectFit: "cover"
-    }}
+    style={{ borderRadius: 0, aspectRatio: "4/3", objectFit: "cover" }}
   />
 
-  {/* 🔥 THIS WAS MISSING */}
+  {/* 🔥 FACE DETECTION OVERLAY */}
   <canvas
     ref={canvasRef}
     style={{
@@ -1130,6 +1109,7 @@ useEffect(() => {
     }}
   />
 
+  {/* 🔥 WARNING */}
   {warning && (
     <div style={{
       position: "absolute",

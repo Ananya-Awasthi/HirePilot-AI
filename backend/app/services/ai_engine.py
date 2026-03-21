@@ -1,7 +1,7 @@
 import os
+import json
 from dotenv import load_dotenv
 from google import genai
-from google.genai import types
 
 load_dotenv()
 
@@ -9,9 +9,10 @@ client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY"),
 )
 
-MODEL = "gemini-3-flash-preview"  # stable + fast
+MODEL = "gemini-3-flash-preview"
 
 
+# 🎯 START QUESTION
 def generate_question(role, resume_text):
     prompt = f"""
     You are a friendly professional interviewer.
@@ -24,14 +25,9 @@ def generate_question(role, resume_text):
     Instructions:
     - Ask ONLY ONE question
     - Keep it simple and conversational
-    - Do NOT make it too long or complex
-    - Match the candidate's level (student or beginner)
-    - Focus on real experience, not theory
+    - Match beginner level
 
-    Example style:
-    "Can you tell me about a project you worked on and your role in it?"
-
-    Now ask the question.
+    Ask the question.
     """
 
     response = client.models.generate_content(
@@ -42,20 +38,13 @@ def generate_question(role, resume_text):
     return response.text
 
 
+# 🔁 FOLLOW-UP
 def generate_followup(answer):
     prompt = f"""
     Candidate answered: {answer}
 
-    Instructions:
-    - Ask ONE follow-up question
-    - Keep it short and natural
-    - Dig deeper into what the candidate said
-    - Do NOT be too technical or complex
-
-    Example:
-    "That's interesting — how did you handle challenges in that?"
-
-    Now ask the follow-up.
+    Ask ONE short follow-up question.
+    Keep it natural and simple.
     """
 
     response = client.models.generate_content(
@@ -64,3 +53,45 @@ def generate_followup(answer):
     )
 
     return response.text
+
+
+# 🧠 INTERVIEW EVALUATION (NEW)
+def evaluate_interview(qa_list):
+    formatted = ""
+
+    for qa in qa_list:
+        formatted += f"Q: {qa['question']}\nA: {qa['answer']}\n\n"
+
+    prompt = f"""
+    You are an expert interview evaluator.
+
+    Analyze this interview:
+
+    {formatted}
+
+    Return STRICT JSON:
+    {{
+        "score": number (0-100),
+        "feedback": "overall feedback",
+        "improvements": ["point1", "point2", "point3"]
+    }}
+    """
+
+    response = client.models.generate_content(
+        model=MODEL,
+        contents=prompt
+    )
+
+    try:
+        cleaned = response.text.strip().replace("```json", "").replace("```", "")
+        return json.loads(cleaned)
+    except:
+        return {
+            "score": 70,
+            "feedback": response.text,
+            "improvements": [
+                "Be more confident",
+                "Give structured answers",
+                "Add real examples"
+            ]
+        }

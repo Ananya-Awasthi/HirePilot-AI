@@ -13,6 +13,7 @@ import Impact from "./components/Impact";
 import Tech from "./components/Tech";
 import CTA from "./components/CTA";
 import ChatButton from "./components/ChatButton";
+import Leaderboard from "./pages/leaderboard";  
 
 // 🔥 IMPORT PAGES
 import Details from "./pages/Details";
@@ -65,6 +66,8 @@ export default function App() {
 
         {/* 📊 DASHBOARD PAGE */}
         <Route path="/dashboard" element={<Dashboard />} />
+
+        <Route path="/leaderboard" element={<Leaderboard />} />
 
       </Routes>
 

@@ -5,6 +5,7 @@ from chatbot.chatbot_routes import router as chatbot_router
 import threading
 #from app.services.vision import start_confidence_tracking
 from app.routes import vision_routes
+from app.routes import leaderboard
 
 
 
@@ -29,6 +30,7 @@ app.include_router(interview.router)
 app.include_router(confidence.router)
 app.include_router(vision_routes.router)
 app.include_router(chatbot_router)
+app.include_router(leaderboard.router)
 
 @app.get("/")
 def home():
