@@ -24,12 +24,14 @@ It analyzes resumes, generates role-based questions, captures user responses, an
 
 **🏗️ Tech Stack**
 
-**Frontend***
+**Frontend**
+
 React.js
 Face API.js (for face detection)
 CSS (custom styling)
 
 **Backend**
+
 FastAPI
 Python
 AI Engine (custom logic / OpenAI integration if used)
@@ -74,6 +76,7 @@ npm start
 ---
 
 **🧠 How It Works**
+
 -User uploads resume & selects role
 
 -AI generates first interview question
